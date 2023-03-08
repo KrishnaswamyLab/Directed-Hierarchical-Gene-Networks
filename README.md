@@ -4,8 +4,10 @@ Comparison of representation approaches for gene embeddings, especially with dir
 
 
 Hyperparameter optimizations in `FILE.sh`.
+Configurations in `config.py`.
+Main `train.py` calls functions.
 
 Example run from current directory:
 ```
-python train.py --model Node2Vec
+python train.py --model Node2Vec --dataset omnipath
 ```
