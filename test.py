@@ -15,9 +15,14 @@ from run.run_pm import run_pm
 def train(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    splits = np.load(f'data/{args.dataset}_curated_interactions.npz')
-    data = splits['train'] # keep training graph only
-    data = pd.DataFrame(data, columns=['source_genesymbol', 'target_genesymbol'])
+    if args.dataset == 'omnipath':
+        splits = np.load(f'data/{args.dataset}_curated_interactions_with_edges.npz')
+        data = np.vstack((splits['train'], splits['val'])) # keep training and validation graph only
+        data = pd.DataFrame(data, columns=['source_genesymbol','type', 'target_genesymbol'])
+    else:
+        splits = np.load(f'data/{args.dataset}_curated_interactions.npz')
+        data = np.vstack((splits['train'], splits['val'])) # keep training and validation graph only
+        data = pd.DataFrame(data, columns=['source_genesymbol', 'target_genesymbol'])
 
     if args.model == 'Node2Vec':
         run_node2vec(data, args)

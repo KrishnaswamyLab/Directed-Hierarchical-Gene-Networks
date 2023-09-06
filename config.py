@@ -2,11 +2,11 @@ import argparse
 
 config_args = {
     'training_config': {
-        'lr': (0.01, 'learning rate'),
+        'lr': (0.001, 'learning rate'),
         'dropout': (0.0, 'dropout probability'),
-        'epochs': (200, 'maximum number of epochs to train for'),
+        'epochs': (50, 'maximum number of epochs to train for'),
         'weight-decay': (0., 'l2 regularization strength'),
-        'patience': (50, 'patience for early stopping'),
+        'patience': (10, 'patience for early stopping'),
         'min-epochs': (50, 'do not early stop before min-epochs'),
         'seed': (1234, 'seed for training'),
         'c': (1.0, 'hyperbolic radius'),
@@ -17,11 +17,13 @@ config_args = {
         'edge_attribute': (0, 'include edge attribute for KGE models'),
         'margin': (9.0, 'margin for NSSA loss for KGE models'),
         'temperature': (1.0, 'adversarial temperature for NSSA loss for KGE models'),
+        'J': (15, 'scale for geometric scattering'),
         'compute-scattering': (False, 'compute scattering from data versus use pretrained scattering coefficients'),
+        'device': ('cuda:0', 'device for training'),
     },
     'model_config': {
         'model': ('Node2Vec', 'which encoder to use, can be any of [Node2Vec, TransE, ConvE, PoincareMap, GAE, HGCN, MagNet, UDS-AE, DS-AE]'),
-        'dim': (16, 'embedding dimension'),
+        'dim': (128, 'embedding dimension'),
         'num-layers': (2, 'number of hidden layers in encoder'),
         'bias': (1, 'whether to use bias (1) or not (0)'),
         'act': ('relu', 'which activation function to use [of relu, complexrelu (MagNet), tanh, or None]'),
@@ -29,9 +31,6 @@ config_args = {
      },
     'data_config': {
         'dataset': ('omnipath', 'which dataset to use, can be between [omnipath, lrtree]'),
-        'val-prop': (0.05, 'proportion of validation edges for link prediction'),
-        'test-prop': (0.1, 'proportion of test edges for link prediction'),
-        'split-seed': (1234, 'seed for data splits (train/test/val)'),
         'save-as': ('0', 'name for embedding iteration'),
         'symmetrize-adj': (True, 'symmetrize adjacency matrix for undirected graphs')
     }
