@@ -1,6 +1,4 @@
-import sys
-sys.path.append('/home/aarthivenkat/cell_cell_comm/graph_scattering_FINAL')
-
+import os
 import pandas as pd
 import torch
 import networkx as nx
@@ -12,8 +10,8 @@ patch_sklearn()
 
 def get_pretrained_directed_scattering(data, args):
     q = float(args.q)
-    J = 15
-    ds = np.load(f'results/{args.model}/Directed_Scattering_J{J}_q{q}_{args.dataset}_embedding.npy')
+    J = int(args.J)
+    ds = pd.read_csv(f'results/Directed_Scattering/Directed_Scattering_J{J}_q{q}_{args.dataset}_train_val_embedding.csv', compression='gzip',index_col=0)
     return ds
 
 def run_directed_scattering(data, args):
@@ -31,5 +29,6 @@ def run_directed_scattering(data, args):
     if not os.path.exists(f'results/{args.model}/'):
         os.makedirs(f'results/{args.model}')
     
-    filename = f"results/{args.model}/Directed_Scattering_J{J}_q{q}_{args.dataset}_embedding.npy"
-    np.save(filename, all_features)
+    filename = f"results/Directed_Scattering/Directed_Scattering_J{J}_q{q}_{args.dataset}_embedding.csv"
+    train_ds = pd.DataFrame(data=all_features, index=G.nodes())
+    train_ds.to_csv(filename, compression='gzip')

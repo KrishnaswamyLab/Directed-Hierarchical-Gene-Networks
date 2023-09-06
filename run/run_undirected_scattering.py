@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy import spatial
 import pandas as pd
@@ -116,9 +117,9 @@ class graph_scattering(object):
                     self.kurtosis = np.append(self.kurtosis, kurtosis)
 
         return self.mean, self.variance, self.skew, self.kurtosis
-    
+
 def get_pretrained_undirected_scattering(data, args):
-    uds = np.load(f'results/{args.model}/Undirected_Scattering_{args.dataset}_embedding.npy')
+    uds = pd.read_csv(f'results/Undirected_Scattering/Undirected_Scattering_{args.dataset}_train_val_embedding.csv', index_col=0)
     return uds
     
 def run_undirected_scattering(data, args):

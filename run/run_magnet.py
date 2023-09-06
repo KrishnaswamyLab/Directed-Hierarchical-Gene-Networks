@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import scipy
 import networkx as nx
@@ -12,7 +13,7 @@ from torch_geometric_signed_directed.utils import link_class_split, in_out_degre
 from torch_geometric_signed_directed.data import DirectedData
 from torch_geometric_signed_directed.nn.directed import complex_relu_layer
 from torch_geometric_signed_directed.nn.directed import MagNetConv
-from torch_geometric.utils import train_test_split_edges
+from torch_geometric.utils import negative_sampling, to_undirected, to_scipy_sparse_matrix
 
 device = torch.device('cpu')
 
@@ -54,7 +55,7 @@ class MagNet_link_prediction(nn.Module):
                                 bias=bias))
         self.normalization = normalization
         self.activation = activation
-        if self.activation == 'complexrelu':
+        if self.activation:
             self.complex_relu = complex_relu_layer()
 
         for _ in range(1, layer):
@@ -102,8 +103,7 @@ class MagNet_link_prediction(nn.Module):
 def train(model, optimizer, X_real, X_img, y, edge_index, edge_weight, query_edges):
     model.train()
     embedding, out = model(X_real, X_img, edge_index=edge_index,
-                    query_edges=query_edges,
-                    edge_weight=edge_weight)
+                    query_edges=query_edges, edge_weight=edge_weight)
     
     criterion = torch.nn.NLLLoss()
     loss = criterion(out, y)
@@ -113,16 +113,6 @@ def train(model, optimizer, X_real, X_img, y, edge_index, edge_weight, query_edg
     train_acc = accuracy_score(y.cpu(),
     out.max(dim=1)[1].cpu())
     return loss.detach().item(), train_acc, embedding
-
-def test(model, X_real, X_img, y, edge_index, edge_weight, query_edges):
-    model.eval()
-    with torch.no_grad():
-        embedding, out = model(X_real, X_img, edge_index=edge_index,
-                    query_edges=query_edges,
-                    edge_weight=edge_weight)
-    test_acc = accuracy_score(y.cpu(),
-    out.max(dim=1)[1].cpu())
-    return test_acc, embedding
 
 def run_magnet(data, args):
     
@@ -137,33 +127,30 @@ def run_magnet(data, args):
     edge_index = torch.sparse_coo_tensor(i, v, torch.Size(shape)).to_dense().nonzero().t().contiguous()
     data = DirectedData(x=torch.Tensor(np.eye(G.number_of_nodes())), edge_index=edge_index)
     
-    link_data = link_class_split(data, prob_val=args.val_prop, prob_test=args.test_prop, task=args.task,
-                                 device=device, seed=args.split_seed, splits=1)
+    # train/val/test split happens before model training, concatenating val and test edges with train
+    link_data = link_class_split(data, prob_val=0.005, prob_test=0.005, task=args.task,
+                                 device=device, splits=1)
     
     model = MagNet_link_prediction(q=args.q, K=1, num_features=data.x.shape[0],
                                    hidden=int(args.dim / 2), label_dim=args.num_classes, bias=bool(args.bias), dropout=args.dropout,
                                    activation=args.act, layer=args.num_layers).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     
-    edge_index = link_data[0]['graph']
-    edge_weight = link_data[0]['weights']
-    query_edges = link_data[0]['train']['edges']
-    y = link_data[0]['train']['label']
-    
-    query_val_edges = link_data[0]['val']['edges']
-    y_val = link_data[0]['val']['label']
+    edge_index = edge_index
+    edge_weight = torch.Tensor([1]*edge_index.shape[1])
+    query_edges = torch.vstack((link_data[0]['train']['edges'], link_data[0]['val']['edges'], link_data[0]['test']['edges']))
+    y = torch.hstack((link_data[0]['train']['label'], link_data[0]['val']['label'], link_data[0]['test']['label']))
     
     X_real = torch.eye(data.x.shape[0]).to(device)
     X_img = X_real.clone()
     
-    best_val_acc = 0
+    best_acc = 0
     count = 0
     best_model = model
     for epoch in range(args.epochs):
         train_loss, train_acc, train_embedding = train(model, optimizer, X_real, X_img, y, edge_index, edge_weight, query_edges)
-        val_acc, val_embedding = test(model, X_real, X_img, y_val, edge_index, edge_weight, query_val_edges)
-        if (val_acc > best_val_acc):
-            best_val_acc = val_acc.copy()
+        if (train_acc > best_acc):
+            best_acc = train_acc.copy()
             best_model = model
             count = 0
         else:
@@ -177,9 +164,10 @@ def run_magnet(data, args):
     embedding, out = best_model(X_real, X_img, edge_index=data.edge_index,
                            query_edges = data.edge_index.T, edge_weight=data.edge_weight)
     
-    if not os.path.exists(f'results/{args.model}/'):
-        os.makedirs(f'results/{args.model}')
-    
-    np.save(f'results/{args.model}/{args.save_as}_{args.dataset}_embedding.npy', embedding.detach().numpy())
-    with open(f'results/{args.model}/{args.save_as}_{args.dataset}_config.json', 'w') as f:
-        json.dump(vars(args), f)
+    if not os.path.exists(f'results/{args.model}/{args.dataset}'):
+        os.makedirs(f'results/{args.model}/{args.dataset}')
+        
+    np.savez_compressed(f'results/{args.model}/{args.dataset}/{args.save_as}_results.npz',
+                        embedding=embedding.detach().numpy(),
+                        config=vars(args),
+                        names=G.nodes)

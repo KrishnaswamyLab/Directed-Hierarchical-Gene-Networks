@@ -1,3 +1,4 @@
+import os
 import torch, scipy, json
 from torch import nn
 from torch_geometric.nn import GCNConv, GAE
@@ -58,11 +59,11 @@ def runGCN(coo, n_features, args, encoder=GCNEncoder):
         model.eval()
         with torch.no_grad():
             z = model.encode(train_data.x, train_data.edge_label_index[:, train_data.edge_label == 1])
-        return model.test(z, test_data.edge_label_index[:, test_data.edge_label == 1],
-                          test_data.edge_label_index[:, test_data.edge_label == 0])
+        return model.test(z, train_data.edge_label_index[:, train_data.edge_label == 1],
+                          train_data.edge_label_index[:, train_data.edge_label == 0])
     
     # Setup
-    device = torch.device('cuda:1')
+    device = torch.device(args.device)
     values = coo.data
     indices = np.vstack((coo.row, coo.col))
 
@@ -72,7 +73,7 @@ def runGCN(coo, n_features, args, encoder=GCNEncoder):
     
     transform = T.Compose([
                 T.ToDevice(device),
-                T.RandomLinkSplit(num_val=args.val_prop, num_test=args.test_prop,
+                T.RandomLinkSplit(num_val=0.0, num_test=0.0,
                                   is_undirected=args.symmetrize_adj, add_negative_train_samples=True)])
 
     data = Data(x=torch.eye(n_features),
@@ -92,14 +93,14 @@ def runGCN(coo, n_features, args, encoder=GCNEncoder):
     
     # inizialize the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    best_val_auroc = 0
+    best_auroc = 0
     count = 0
     best_model = model
     for epoch in range(1, args.epochs + 1):
         train_loss = train()
-        val_auroc, val_auprc = test()
-        if (val_auroc > best_val_auroc):
-            best_val_auroc = val_auroc
+        train_auroc, train_auprc = test()
+        if (train_auroc > best_auroc):
+            best_auroc = train_auroc
             best_model = model
             count = 0
         else:
@@ -125,11 +126,12 @@ def run_gae(data, args):
         G = nx.from_pandas_edgelist(data, source='source_genesymbol', target='target_genesymbol', create_using=nx.DiGraph)
         
     A = scipy.sparse.coo_matrix(nx.adjacency_matrix(G))
-    embedding = runGCN(A, n_features=data.shape[0], args=args)
+    embedding = runGCN(A, n_features=G.number_of_nodes(), args=args)
     
-    if not os.path.exists(f'results/{args.model}/'):
-        os.makedirs(f'results/{args.model}')
-
-    np.save(f'results/{args.model}/{args.save_as}_{args.dataset}_embedding.npy', embedding)
-    with open(f'results/{args.model}/{args.save_as}_{args.dataset}_config.json', 'w') as f:
-        json.dump(vars(args), f)
+    if not os.path.exists(f'results/{args.model}/{args.dataset}'):
+        os.makedirs(f'results/{args.model}/{args.dataset}')
+        
+    np.savez_compressed(f'results/{args.model}/{args.dataset}/{args.save_as}_results.npz',
+                        embedding=embedding,
+                        config=vars(args),
+                        names=G.nodes)

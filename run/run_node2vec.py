@@ -13,9 +13,10 @@ def run_node2vec(data, args):
     node_ids = model.wv.index_to_key  # list of node IDs
     embedding = model.wv.vectors
 
-    if not os.path.exists(f'results/{args.model}/'):
-        os.makedirs(f'results/{args.model}')
-    
-    np.save(f'results/{args.model}/{args.save_as}_{args.dataset}_embedding.npy', embedding)
-    with open(f'results/{args.model}/{args.save_as}_{args.dataset}_config.json', 'w') as f:
-        json.dump(vars(args), f)
+    if not os.path.exists(f'results/{args.model}/{args.dataset}'):
+        os.makedirs(f'results/{args.model}/{args.dataset}')
+        
+    np.savez_compressed(f'results/{args.model}/{args.dataset}/{args.save_as}_results.npz',
+                        embedding=embedding,
+                        config=vars(args),
+                        names=G.nodes)
