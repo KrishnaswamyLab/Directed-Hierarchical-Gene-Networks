@@ -1,4 +1,4 @@
-for dataset in Cora_ml Texas Cornell Wisconsin; do
+for dataset in Texas Cornell omnipath SIGNOR iPTMnet; do
     counter=0
     for lr in 0.01; do
         for c in 0.5 1 1.5; do
